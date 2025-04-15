@@ -1,6 +1,7 @@
 # 安裝說明
 ## 目錄結構
 ### helm-templateproject
+<pre>
 │── Chart.yaml
 │── charts    
 │── values.yaml
@@ -34,6 +35,7 @@
            │── serviceaccount.yaml
            └── tests
                  └── test-connection.yaml
+</pre>
 ---
 ## 背景知識說明
 #### 參數覆蓋
@@ -67,9 +69,10 @@ Jenkins的自動安裝指令中就會使用以下三個參數檔做安裝,
 ---
 ## 安裝方法
 #### 因為需要掛載額外的httpscerts憑證, 所以只限使用Jenkins做CI&CD
-Alpha Jenkins link: https://jenkins-alpha.xxx.com/job/templateproject/job/ALPHA-K8S-templateproject-Deploy/
-Stage Jenkins link: https://jenkins-stage.xxx.com/job/templateproject/job/STAGE-K8S-templateproject-Deploy/
-Prod Jenkins link: https://jenkins-prod.xxx.com/job/templateproject/job/templateproject-deploy/
+- Alpha Jenkins link: https://jenkins-alpha.xxx.com/job/templateproject/job/ALPHA-K8S-templateproject-Deploy/
+- Stage Jenkins link: https://jenkins-stage.xxx.com/job/templateproject/job/STAGE-K8S-templateproject-Deploy/
+- Prod Jenkins link: https://jenkins-prod.xxx.com/job/templateproject/job/templateproject-deploy/
+
 #### 開發helm chart時debug用的安裝指令
 ```
 helm upgrade -n {dev_namespace} templateproject . -f env-values/stage.yaml \
@@ -89,5 +92,6 @@ task-liquibase-executor
 因為service-templateproject-cron-standalone僅限存在1台
 ##### 4. log-agent promtail啟用條件
 version=prod
+
 ---
 ## 新增新服務時修改方法
