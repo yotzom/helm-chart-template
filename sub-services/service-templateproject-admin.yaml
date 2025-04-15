@@ -1,0 +1,16 @@
+service-templateproject-admin:
+  port: 8080
+  resources:
+    limits:
+      cpu: 2
+      memory: 4096Mi
+    requests:
+      cpu: 1
+      memory: 2048Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 4
+    maxReplicas: 6
+  label:
+    highCpu: highCpu
+    highMemory: highMemory

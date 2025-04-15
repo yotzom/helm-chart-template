@@ -1,0 +1,202 @@
+{{- if contains "app" .Values.installMode }}
+{{- $customService := index (include "templateproject.customService" . | fromYaml) .Values.serviceName }}
+{{- if ne "task-liquibase-executor" $.Values.serviceName -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "templateproject.fullname" . }}
+  labels:
+    app: {{ .Values.serviceName }}
+    {{- include "templateproject.labels" . | nindent 4 }}
+spec:
+  {{- if and (not $customService.autoscaling.enabled) (ne "prod" $.Values.version) }}
+  replicas: {{ if eq "service-templateproject-cron-standalone" $.Values.serviceName }}1{{ else }}{{ .Values.replicaCount }}{{ end }}
+  {{- end }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      {{- include "templateproject.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        updatetime: {{ dateInZone "2006-01-02T15:04:05" (now) "Asia/Taipei" | quote }}
+        rollme: {{ randAlphaNum 20 | quote }}
+        {{- with .Values.podAnnotations }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        resoureType: "deployment"
+        serviceName: {{ $.Values.serviceName | quote }}
+        {{- toYaml (coalesce $customService.label (dict "default" "default")) | nindent 8 }}
+        {{- include "templateproject.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "templateproject.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repoUri }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if not (or (contains "templateproject--" $.Values.serviceName) (eq "ccc" $.Values.serviceName)) }}
+            {{- $memoryLimits := $.Values.resources.limits.memory }}
+            {{- if hasKey $customService "resources" }}
+              {{- if hasKey $customService.resources "limits" }}
+                {{- if hasKey $customService.resources.limits "memory" }}
+                  {{- $memoryLimits = $customService.resources.limits.memory }}
+                {{- end }}
+              {{- end }}
+            {{- end }}
+            {{- $memoryLimits := sub (int (regexFind "[0-9]+" $memoryLimits)) 1024 }}
+            {{- $memoryLimits := (gt $memoryLimits 512 | ternary $memoryLimits 512) }}
+            {{- $memoryLimits := (ne .Values.version "prod" | ternary 1024 $memoryLimits) }}
+          command: ["sh", "-c"]
+          args: 
+            - |
+              exec java -XX:InitialRAMPercentage=20 -XX:MaxRAMPercentage=60 -Dserver.port={{ $customService.port }} -jar /project/www/*.jar \
+              -XX:-OmitStackTraceInFastThrow -Dlogback.project={{ $.Values.serviceName }} \
+              -XX:NativeMemoryTracking=detail -Xlog:gc*=info:file=/project/log/log.gc \
+              -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/project/log/oom-error-{{ dateInZone "2006-01-02T15:04:05" (now) "Asia/Taipei" | quote }}-oom.log
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ $customService.port | int }}
+              protocol: TCP
+          {{- if or ($customService.startupProbe) ($.Values.startupProbe) }}
+          startupProbe:
+            {{- toYaml (coalesce $customService.startupProbe $.Values.startupProbe) | nindent 12 }}
+          {{- end }}
+          {{- if or ($customService.livenessProbe) ($.Values.livenessProbe) }}
+          livenessProbe:
+            {{- toYaml (coalesce $customService.livenessProbe $.Values.livenessProbe) | nindent 12 }}
+          {{- end }}
+          {{- if or ($customService.readinessProbe) ($.Values.readinessProbe) }}
+          readinessProbe:
+            {{- toYaml (coalesce $customService.livenessProbe $.Values.readinessProbe) | nindent 12 }}
+          {{- end }}
+          {{- if and (or ($customService.resources) ($.Values.resources)) (eq "prod" $.Values.version )}}
+          resources:
+            {{- toYaml (coalesce $customService.resources $.Values.resources) | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+          - name: host-time
+            readOnly: true
+            mountPath: /etc/localtime
+          - name: logs
+            mountPath: /project/log
+          {{- if or (contains "templateproject--" $.Values.serviceName) (eq "ccc" $.Values.serviceName) }}
+          - mountPath: /etc/nginx/conf.d
+            name: nginx-config
+            readOnly: true
+          {{- end }}
+          {{- if or (eq "aaa" .Values.serviceName) (eq "bbb" .Values.serviceName) }}
+          - mountPath: /project/www/httpscerts
+            name: httpscerts-secret
+            readOnly: true
+          {{- end }}
+        {{- if (eq "prod" .Values.version) }}
+        - name: promtail
+          image: public.ecr.aws/bitnami/promtail:3.3.0
+          args:
+            - "-config.expand-env=true"
+            - "-config.file=/etc/promtail/promtail.yaml"
+          env:
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          volumeMounts:
+          - name: logs
+            mountPath: /project/log
+          - name: promtail-config
+            mountPath: /etc/promtail
+          resources:
+            limits:
+              cpu: 1
+              memory: 1024Mi
+            requests:
+              cpu: 0.1
+              memory: 100Mi
+        {{- end }}
+      volumes:
+      - name: host-time
+        hostPath:
+          path: /etc/localtime
+      - name: logs
+        emptyDir: {}
+      {{- if or (contains "templateproject--" $.Values.serviceName) (eq "ccc" $.Values.serviceName) }}
+      - name: nginx-config
+        configMap:
+          name: {{ include "templateproject.fullname" $ }}-{{ $.Values.serviceName }}-frontend-nginx-config
+      {{- end }}
+      {{- if (eq "prod" .Values.version) }}
+      - name: promtail-config
+        configMap:
+          name: {{ include "templateproject.fullname" $ }}-{{ $.Values.serviceName }}-promtail-config
+      {{- end }}
+      {{- if or (eq "aaa" .Values.serviceName) (eq "bbb" .Values.serviceName) }}
+      - name: httpscerts-secret
+        secret:
+          secretName: {{ include "templateproject.fullname" . }}-{{ $.Values.serviceName }}-httpscerts-secrets
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      # rule 1. prevent same type service in one node
+      # rule 2. prevent service of high memory usage in one node
+      # rule 3. prevent service of high cpu usage in one node
+      # sort: 1 > 2 > 3
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: serviceName
+                  operator: In
+                  values:
+                  - {{ $.Values.serviceName | quote }}
+              topologyKey: "kubernetes.io/hostname"
+          {{- if $customService.label -}}
+          {{- if hasKey $customService.label "highMemory" }}
+          - weight: 90
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: highMemory
+                  operator: In
+                  values:
+                  - highMemory
+              topologyKey: "kubernetes.io/hostname"
+          {{- end }}
+          {{- if hasKey $customService.label "highCpu" }}
+          - weight: 80
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: highCpu
+                  operator: In
+                  values:
+                  - highCpu
+              topologyKey: "kubernetes.io/hostname"
+          {{- end }}
+          {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.additionPodConfiguration }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+{{- end }}
+{{- end }}

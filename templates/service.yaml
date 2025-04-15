@@ -1,0 +1,20 @@
+{{- if contains "app" .Values.installMode }}
+{{- $customService := index (include "templateproject.customService" . | fromYaml) .Values.serviceName }}
+{{- if ne "task-liquibase-executor" $.Values.serviceName -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "templateproject.fullname" . }}
+  labels:
+    {{- include "templateproject.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.services.type }}
+  ports:
+    - name: http
+      targetPort: http
+      protocol: TCP
+      port: {{ $customService.port | int }}
+  selector:
+    {{- include "templateproject.selectorLabels" . | nindent 4 }}
+{{- end }}
+{{- end }}

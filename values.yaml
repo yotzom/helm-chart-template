@@ -1,0 +1,100 @@
+# Default values for templateproject.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+installMode: app #app or ingress
+version: alpha # alpha or prod
+serviceName: "serviceName"
+
+replicaCount: 1
+
+image:
+  repoUri: "dockerhub.io/templateproject/all"
+  tag: "prod_v1.0_ca1751a0asc8b295aa5f89bz459d4f52g5j56121"
+  pullPolicy: Always #IfNotPresent
+
+podLabels: 
+  Owner: DEVOPS
+  Project: templateproject
+  CostCenter: DEVOPS
+
+autoscaling:
+  targetCPUUtilizationPercentage: 75
+  targetMemoryUtilizationPercentage: 80
+
+startupProbe:
+  httpGet:
+    path: /actuator/health/liveness
+    port: http
+  failureThreshold: 24
+  periodSeconds: 5
+livenessProbe:
+  httpGet:
+    path: /actuator/health/liveness
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+readinessProbe:
+  httpGet:
+    path: /actuator/health/readiness
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+
+nodeSelector: 
+  app: all
+  arch: x86
+
+additionPodConfiguration:
+  restartPolicy: Always
+  terminationGracePeriodSeconds: 30
+  dnsPolicy: ClusterFirst
+
+ingress:
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: "/$1"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100M"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-next-upstream-timeout: "300"
+
+tolerations: []
+
+# - name: foo
+#   secret:
+#     secretName: mysecret
+#     optional: false
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+services:
+  type: ClusterIP
+
+podAnnotations: {}
+
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: false
+  # Automatically mount a ServiceAccount's API credentials?
+  automount: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""

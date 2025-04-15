@@ -1,0 +1,35 @@
+{{- if contains "app" .Values.installMode }}
+{{- $customService := index (include "templateproject.customService" . | fromYaml) .Values.serviceName }}
+{{- if and (eq "prod" .Values.version) (ne "task-liquibase-executor" $.Values.serviceName) (ne "service-templateproject-cron-standalone" $.Values.serviceName) }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "templateproject.fullname" . }}
+  labels:
+    {{- include "templateproject.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "templateproject.fullname" . }}
+  minReplicas: {{ $customService.autoscaling.minReplicas }}
+  maxReplicas: {{ $customService.autoscaling.maxReplicas }}
+  metrics:
+    {{- if $.Values.autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ $.Values.autoscaling.targetCPUUtilizationPercentage }}
+    {{- end }}
+    {{- if $.Values.autoscaling.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ $.Values.autoscaling.targetMemoryUtilizationPercentage }}
+    {{- end }}
+{{- end }}
+{{- end }}

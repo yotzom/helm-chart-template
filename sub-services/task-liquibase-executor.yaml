@@ -1,0 +1,10 @@
+task-liquibase-executor:
+  resources:
+    limits:
+      cpu: 2
+      memory: 4096Mi
+    requests:
+      cpu: 0.5
+      memory: 2048Mi
+  autoscaling:
+    enabled: false

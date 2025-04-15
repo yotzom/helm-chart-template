@@ -1,0 +1,35 @@
+sample-service: 
+  port: 8080
+  resources:
+    limits:
+      cpu: 2
+      memory: 1536Mi
+    requests:
+      cpu: 0.1
+      memory: 1536Mi
+  startupProbe:
+    httpGet:
+      path: /stTradeApp/ok
+      port: http
+    initialDelaySeconds: 5
+    failureThreshold: 8
+    periodSeconds: 30
+  livenessProbe:
+    httpGet:
+      path: /stTradeApp/ok
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 30
+  readinessProbe:
+    httpGet:
+      path: /stTradeApp/ok
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 30
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
+    targetMemoryUtilizationPercentage: 80
+  nodeSelector: {}

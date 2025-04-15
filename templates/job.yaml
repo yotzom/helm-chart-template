@@ -1,0 +1,74 @@
+{{- if contains "app" .Values.installMode }}
+{{- if eq "task-liquibase-executor" $.Values.serviceName -}}
+{{- $customService := index (include "templateproject.customService" . | fromYaml) .Values.serviceName }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "templateproject.fullname" . }}-{{ now | date "2006-01-02-15-04-05s" }}
+  labels:
+    app: {{ .Values.serviceName }}
+    {{- include "templateproject.labels" . | nindent 4 }}
+spec:
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 15552000 #  remove job after a half year
+  template:
+    metadata:
+      annotations:
+        updatetime: {{ now | date "2006-01-02t15:04:05" | quote }}
+        rollme: {{ randAlphaNum 5 | quote }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "templateproject.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ include "templateproject.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repoUri }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- $memoryLimits := $.Values.resources.limits.memory }}
+          {{- if hasKey $customService "resources" }}
+            {{- if hasKey $customService.resources "limits" }}
+              {{- if hasKey $customService.resources.limits "memory" }}
+                {{- $memoryLimits := $customService.resources.limits.memory }}
+              {{- end }}
+            {{- end }}
+          {{- end }}
+          {{- $memoryLimits := sub (int (regexFind "[0-9]+" $memoryLimits)) 512 }}
+          {{- $memoryLimits := (gt $memoryLimits 512 | ternary $memoryLimits 512) }}
+          {{- $memoryLimits := (ne .Values.version "prod" | ternary 1024 $memoryLimits) }}
+          command: ["sh", "-c"]
+          args: ["java -XX:InitialRAMPercentage=20 -XX:MaxRAMPercentage=60 -jar /project/www/*.jar -XX:-OmitStackTraceInFastThrow -Dlogback.project={{ $.Values.serviceName }}"]
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+          - name: host-time
+            readOnly: true
+            mountPath: /etc/localtime
+      volumes:
+      - name: host-time
+        hostPath:
+          path: /etc/localtime
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
+{{- end }}

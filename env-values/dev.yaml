@@ -1,0 +1,36 @@
+resources:
+  limits:
+    cpu: 1
+    memory: 1536Mi
+  requests:
+    cpu: 0.2
+    memory: 512Mi
+    
+ingress:
+  templateproject--tokyo:
+    hostname: 
+      - "templateproject-tokyo.eks.alpha-xxx.com"
+    mappingService:
+      - serviceName: templateproject--tokyo
+        port: 80
+        path: "/(.*)"
+        pathType: ImplementationSpecific
+  templateproject--osaka:
+    hostname: 
+      - "templateproject-osaka.eks.alpha-xxx.com"
+    mappingService:
+      - serviceName: templateproject--osaka
+        port: 80
+        path: "/(.*)"
+        pathType: ImplementationSpecific
+  service-templateproject-client:
+    hostname: 
+      - "templateproject.eks.alpha-xxx.me"
+      - "templateproject.eks.alpha-xxx.com"
+      - "templateproject-tokyo.eks.alpha-xxx.com"
+      - "templateproject-osaka.eks.alpha-xxx.com"
+    mappingService:
+      - serviceName: service-templateproject-client
+        port: 8080
+        path: "/(api/.*)"
+        pathType: ImplementationSpecific

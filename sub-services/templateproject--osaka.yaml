@@ -1,0 +1,6 @@
+templateproject--osaka:
+  port: 80
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5

@@ -1,0 +1,37 @@
+{{- if contains "ingress" .Values.installMode }}
+{{- with .Values.ingress }}
+{{- range $ingressName, $ingressValue := . }}
+{{- if eq $ingressName $.Values.serviceName }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "templateproject.fullname" $ }}-ingress
+  labels:
+    {{- include "templateproject.labels" $ | nindent 4 }}
+  annotations:
+  {{- with $.Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  ingressClassName: nginx
+  rules:
+  {{- range $hostname := $ingressValue.hostname }}
+  - host: {{ $hostname }}
+    http:
+      paths: 
+      {{- range $mappingService := $ingressValue.mappingService }}
+      - path: {{ $mappingService.path }}
+        pathType: {{ $mappingService.pathType }}
+        backend:
+          service:
+            name: {{ $mappingService.serviceName }}
+            port:
+              number: {{ $mappingService.port }}
+      {{- end }}
+  {{- end }}
+
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

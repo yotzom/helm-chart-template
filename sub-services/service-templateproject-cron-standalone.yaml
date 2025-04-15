@@ -1,0 +1,14 @@
+service-templateproject-cron-standalone:
+  port: 8080
+  resources:
+    limits:
+      cpu: 2
+      memory: 4096Mi
+    requests:
+      cpu: 0.5
+      memory: 2048Mi
+  autoscaling:
+    enabled: false
+  label:
+    highCpu: highCpu
+    highMemory: highMemory

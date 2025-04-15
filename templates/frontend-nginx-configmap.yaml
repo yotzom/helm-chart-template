@@ -1,0 +1,87 @@
+{{- if contains "app" .Values.installMode }}
+{{ if or (contains "templateproject--" $.Values.serviceName) (eq "ccc" $.Values.serviceName) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "templateproject.fullname" $ }}-{{ $.Values.serviceName }}-frontend-nginx-config
+  labels: 
+    resoureType: "configmap"
+data:
+  default.conf: |
+    log_format  main_vgp  '$http_x_forwarded_for - $remote_user [$time_local] "$request" '
+                      '$status $body_bytes_sent "$http_referer" '
+                      '"$http_user_agent" "$remote_addr" "session_id=$cookie_jsId" '
+                      '"$request_time" "$upstream_response_time" "remote_addr" "remote_port"';
+                      
+    log_format main_vgp_json   '{"@timestamp":"$time_iso8601",'
+                           '"host":"$server_addr",'
+                           '"clientip":"$remote_addr",'
+                           '"method":"$request_method",'
+                           '"size":"$body_bytes_sent",'
+                           '"request_size":"$request_length",'
+                           '"upstreamhost":"$upstream_addr",'
+                           '"http_host":"$host",'
+                           '"url":"$uri",'
+                           '"domain":"$host",'
+                           '"http_user_agent":"$http_user_agent",'
+                           '"session_id":"$cookie_jsId",'
+                           '"xff":"$http_x_forwarded_for",'
+                           '"referer":"$http_referer",'
+                           '"cf_ray":"$http_cf_ray",'
+                           '"cloudflare_custom":"$http_cf_ipcountry",'
+                           '"status":"$status",'
+                           '"client_address":"$remote_addr",'
+                           '"client_port":"$remote_port",'
+                           '"content-Type":"$http_content_type",'
+                           '"requesttime":"$request_time",'
+                           '"upstream_response_time":"$upstream_response_time",'
+                           '"upstream_connect_time":"$upstream_connect_time",'
+                           '"upstream_header_time":"$upstream_header_time"}';
+
+    server {
+        listen       80;
+        listen  [::]:80;
+        server_name  localhost;
+
+        access_log /project/log/access.nginxlog  main_vgp_json;
+        error_log /project/log/error.nginxlog  error;
+
+        root /usr/share/nginx/html;
+        index index.html;
+
+        location ~* \.(gif|jpg|jpeg|png|css|js|ico|eot|otf|fon|font|ttf|ttc|woff|woff2)$ {
+            add_header Cache-Control 'public';
+        }
+
+        location ~* \.(html)$ {
+            add_header Cache-Control 'no-cache, must-revalidate, proxy-revalidate, max-age=0';
+        }
+
+        location / {
+            try_files $uri $uri/ @rewrites;
+        }
+
+        location @rewrites {
+            rewrite ^(.+)$ /index.html last;
+        }
+
+        location /actuator/health/liveness {
+            access_log off;
+            add_header 'Content-Type' 'text/plain';
+            return 200 "healthy\n";
+        }
+
+        location /actuator/health/readiness {
+            access_log off;
+            add_header 'Content-Type' 'text/plain';
+            return 200 "healthy\n";
+        }
+
+        error_page   500 502 503 504  /50x.html;
+        location = /50x.html {
+            root   /usr/share/nginx/html;
+        }
+
+    }
+{{- end }}
+{{- end }}

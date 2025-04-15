@@ -1,0 +1,43 @@
+{{- if contains "app" .Values.installMode }}
+{{- if (eq "prod" .Values.version) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "templateproject.fullname" $ }}-{{ $.Values.serviceName }}-promtail-config
+  labels: 
+    resoureType: "configmap"
+data:
+  promtail.yaml: |
+    server:
+      http_listen_port: 3101
+      grpc_listen_port: 9095
+    clients:
+      - url: http://loki.prod-xxx.com:80/loki/api/v1/push
+    positions:
+      filename: /tmp/positions.yaml
+    scrape_configs:
+      - job_name: 'javalog'
+        static_configs:
+          - targets: ['localhost']
+            labels:
+              __path__: /project/log/*.log
+              project: {{ include "templateproject.name" . }}
+              service_name: {{ $.Values.serviceName }}
+              namespace: {{ .Release.Namespace }}
+              pod_name: "${HOSTNAME}"
+              node_name: "${NODE_NAME}"
+        pipeline_stages:
+          - multiline:
+              firstline: '^\d{4}-\d{2}-\d{2}'
+              max_wait_time: 5s
+              timeout: 10s
+          - regex:
+              expression: '(?<time>^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\.*\d*)\s\[(?<component>[^\]]+)\]\s*\[traceId=(?<traceId>[a-zA-Z0-9\-]*)\s*spanId=(?<spanId>[a-zA-Z0-9\-]*)\]\s*(?<level>[A-Z]+)\s*(?<logger>[^\s]+)\s*-\s*(?<message>.*)$'
+          - labels:
+              component:
+              trace_id:
+              span_id:
+              level:
+              logger:
+{{- end }}
+{{- end }}
